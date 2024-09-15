@@ -152,7 +152,7 @@ def main():
     
     documentRetrieval = DocumentRetrieval()
     
-    st.title(":orange[SambaNova] Research Assistant")
+    st.title("Research Assistant")
     
     mode = st.sidebar.radio("Choose Mode", ["Document Chat", "Web Search"])
     

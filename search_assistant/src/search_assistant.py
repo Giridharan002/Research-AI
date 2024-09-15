@@ -467,8 +467,6 @@ class SearchAssistant:
         return {'answer': answer, 'sources': links}
 
 
-
-
     def set_retrieval_qa_chain(self, conversational=False):
         retrieval_qa_prompt = load_prompt(os.path.join(kit_dir, 'prompts/llama3-web_scraped_data_retriever.yaml'))
         retriever = self.vector_store.as_retriever(

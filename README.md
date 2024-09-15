@@ -81,9 +81,9 @@ This project is licensed under the MIT License. See the `LICENSE` file for more 
 
 ---
 
-# Code Implementation
+# Use the Research Assistant in your project 😉
 
-## app.py
+## Example `app.py`
 ```python
 import streamlit as st
 from research_assistant import ResearchAssistant

@@ -1,0 +1,18 @@
+_type: prompt
+input_types: {}
+input_variables:
+- context
+- question
+name: null
+output_parser: null
+partial_variables: {}
+template: |
+    You are an AI assistant capable of answering questions based on provided PDF content and web research. Use the following information to answer the question. If the answer is not in the context, say so and provide related information from your web research.
+
+    Context: {context}
+
+    Question: {question}
+
+    Answer:
+template_format: f-string
+validate_template: false

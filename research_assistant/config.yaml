@@ -1,0 +1,53 @@
+api: "sncloud"
+
+embedding_model:
+  "type": "cpu"
+  "batch_size": 1
+  "coe": true
+  "select_expert": "e5-mistral-7b-instruct"
+
+llm:
+  "temperature": 0.01
+  "do_sample": false
+  "max_tokens_to_generate": 1200
+  "coe": true
+  "select_expert": "llama3-405b"
+
+retrieval:
+  "db_type": "chroma"
+  "chunk_size": 1200
+  "chunk_overlap": 240
+  "k_retrieved_documents": 15
+  "score_threshold": 0.2
+  "rerank": false
+  "reranker": 'BAAI/bge-reranker-large'
+  "final_k_retrieved_documents": 5
+
+web_crawling:
+  "max_scraped_websites": 20
+  "excluded_links":
+    - 'facebook.com'
+    - 'twitter.com'
+    - 'instagram.com'
+    - 'linkedin.com'
+    - 'telegram.me'
+    - 'reddit.com'
+    - 'whatsapp.com'
+    - 'wa.me'
+
+pdf_only_mode: true
+
+prod_mode: false
+
+prompts:
+  "qa_prompt": "enterprise_knowledge_retriever/prompts/qa_prompt.yaml"
+  "final_chain_prompt": "enterprise_knowledge_retriever/prompts/final_chain_prompt.yaml"
+
+additional_env_vars:
+  - SERPER_API_KEY
+
+extra_loaders:
+  - "pdf"
+
+
+

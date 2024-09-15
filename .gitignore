@@ -265,3 +265,6 @@ wandb/
 utils/eval/.deepeval-cache.json
 utils/eval/results
 utils/eval/weave
+
+*env/
+research_assistant_env/

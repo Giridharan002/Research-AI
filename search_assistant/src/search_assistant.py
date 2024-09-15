@@ -49,19 +49,7 @@ else:
 
 
 class SearchAssistant:
-    """
-    Class used to do generation over search query results and scraped sites
-    """
-
-    def __init__(self, config=None) -> None:
-        """
-        Initializes the search assistant with the given configuration parameters.
-
-        Args:
-        config (dict, optional):  Extra configuration parameters for the search Assistant.
-        If not provided, default values will be used.
-        """
-
+    def __init__(self, config=None, vectorstore=None) -> None:
         # Set up logger
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
@@ -86,25 +74,13 @@ class SearchAssistant:
         self.urls = None
         self.llm = self.init_llm_model()
         self.vectordb = VectorDb()
+        self.vectorstore = vectorstore
         self.qa_chain = None
         self.memory = None
 
+
     def _get_config_info(self, config_path):
-        """
-        Loads json config file
-
-        Args:
-        config_path (str): Path to the YAML configuration file.
-
-        Returns:
-        api_info (string): string containing API to use SambaStudio or SambaNovaCloud.
-        embedding_model_info (string): String containing embedding model type to use, SambaStudio or CPU.
-        llm_info (dict): Dictionary containing LLM parameters.
-        retrieval_info (dict): Dictionary containing retrieval parameters
-        web_crawling_params (dict): Dictionary containing web crawling parameters
-        extra_loaders (list): list containing extra loader to use when doing web crawling (only pdf available in base kit)
-        prod_mode (bool): Boolean indicating whether the app is in production mode
-        """
+       
         with open(config_path, 'r') as yaml_file:
             config = yaml.safe_load(yaml_file)
         api_info = config['api']
@@ -118,9 +94,6 @@ class SearchAssistant:
         return api_info, embedding_model_info, llm_info, retrieval_info, web_crawling_params, extra_loaders, prod_mode
 
     def init_memory(self):
-        """
-        Initialize conversation summary memory for the conversation
-        """
         summary_prompt = load_prompt(os.path.join(kit_dir, 'prompts/llama3-summary.yaml'))
 
         self.memory = ConversationSummaryMemory(
@@ -134,12 +107,7 @@ class SearchAssistant:
         )
 
     def init_llm_model(self) -> None:
-        """
-        Initializes the LLM endpoint
-
-        Returns:
-        llm (SambaStudio or SambaNovaCloud): Langchain LLM to use
-        """
+       
         if self.prod_mode:
             sambanova_api_key = st.session_state.SAMBANOVA_API_KEY
         else:
@@ -162,15 +130,7 @@ class SearchAssistant:
         return llm
 
     def reformulate_query_with_history(self, query):
-        """
-        Reformulates the query based on the conversation history.
-
-        Args:
-        query (str): The current query to reformulate.
-
-        Returns:
-        str: The reformulated query.
-        """
+    
         if self.memory is None:
             self.init_memory()
         custom_condensed_question_prompt = load_prompt(
@@ -183,35 +143,17 @@ class SearchAssistant:
         return reformulated_query
 
     def remove_links(self, text):
-        """
-        Removes all URLs from the given text.
-
-        Args:
-        text (str): The text from which to remove URLs.
-
-        Returns:
-        str: The text with all URLs removed.
-        """
         url_pattern = r'https?://\S+|www\.\S+'
         return re.sub(url_pattern, '', text)
 
     def parse_serp_analysis_output(self, answer, links):
-        """
-        Parse the output of the SERP analysis prompt to replace the reference numbers with HTML links.
-
-        Parameters:
-        answer (str): The LLM answer of the query using the SERP tool output.
-        links (list): A list of links corresponding to the reference numbers in the prompt.
-
-        Returns:
-        str: The parsed output with HTML links instead of reference numbers.
-        """
         for i, link in enumerate(links):
-            answer = answer.replace(f'[reference:{i+1}]', f'[<sup>{i+1}</sup>]({link})')
-            answer = answer.replace(f'[reference: {i+1}]', f'[<sup>{i+1}</sup>]({link})')
-            answer = answer.replace(f'[Reference:{i+1}]', f'[<sup>{i+1}</sup>]({link})')
-            answer = answer.replace(f'[Reference: {i+1}]', f'[<sup>{i+1}</sup>]({link})')
+            answer = answer.replace(f'[reference:{i+1}]', f'[{i+1}]({link})')
+            answer = answer.replace(f'[reference: {i+1}]', f'[{i+1}]({link})')
+            answer = answer.replace(f'[Reference:{i+1}]', f'[{i+1}]({link})')
+            answer = answer.replace(f'[Reference: {i+1}]', f'[{i+1}]({link})')
         return answer
+
 
     def querySerper(
         self,
@@ -221,18 +163,6 @@ class SearchAssistant:
         include_site_links: bool = False,
         conversational: bool = False,
     ):
-        """
-        A search engine using Serper API. Useful for when you need to answer questions about current events. Input should be a search query.
-
-        Parameters:
-        query (str): The query to search.
-        limit (int, optional): The maximum number of search results to retrieve. Defaults to 5.
-        do_analysis (bool, optional): Whether to perform the LLM analysis directly on the search results. Defaults to True.
-        include_site_links (bool, optional): Whether to include site links in the search results. Defaults to False.
-
-        Returns:
-        tuple: A tuple containing the search results or parsed llm generation and the corresponding links.
-        """
         url = 'https://google.serper.dev/search'
         payload = json.dumps({'q': query, 'num': limit})
         headers = {'X-API-KEY': os.environ.get('SERPER_API_KEY'), 'Content-Type': 'application/json'}
@@ -284,19 +214,6 @@ class SearchAssistant:
         engine='google',
         conversational: bool = False,
     ) -> str:
-        """
-        A search engine using OpenSerp local API. Useful for when you need to answer questions about current events. Input should be a search query.
-
-        Parameters:
-        query (str): The query to search.
-        limit (int, optional): The maximum number of search results to retrieve. Defaults to 5.
-        do_analysis (bool, optional): Whether to perform the LLM analysis directly on the search results. Defaults to True.
-        include_site_links (bool, optional): Whether to include site links in the search results. Defaults to False.
-        engine (str, optional): The search engine to use
-
-        Returns:
-        tuple: A tuple containing the search results or parsed llm generation and the corresponding links.
-        """
         if engine not in ['google', 'yandex', 'baidu']:
             raise ValueError('engine must be either google, yandex or baidu')
         url = f'http://127.0.0.1:7000/{engine}/search'
@@ -342,18 +259,6 @@ class SearchAssistant:
         do_analysis: bool = True,
         engine='google',
     ) -> str:
-        """
-        A search engine using Serpapi API. Useful for when you need to answer questions about current events. Input should be a search query.
-
-        Parameters:
-        query (str): The query to search.
-        limit (int, optional): The maximum number of search results to retrieve. Defaults to 5.
-        do_analysis (bool, optional): Whether to perform the LLM analysis directly on the search results. Defaults to True.
-        engine (str, optional): The search engine to use
-
-        Returns:
-        tuple: A tuple containing the search results or parsed llm generation and the corresponding links.
-        """
         if engine not in ['google', 'bing']:
             raise ValueError('engine must be either google or bing')
         params = {
@@ -361,7 +266,7 @@ class SearchAssistant:
             'num': limit,
             'engine': engine,
             'api_key': st.session_state.SERPAPI_API_KEY if self.prod_mode else os.environ.get('SERPAPI_API_KEY'),
-        }
+        }   
 
         try:
             search = GoogleSearch(params)
@@ -396,25 +301,11 @@ class SearchAssistant:
             return context, links
 
     def load_remote_pdf(self, url):
-        """
-        Load PDF files from the given URL.
-        Args:
-            url (str): URL to load pdf document from.
-        Returns:
-            list: A list of loaded pdf documents.
-        """
         loader = UnstructuredURLLoader(urls=[url])
         docs = loader.load()
         return docs
 
     def load_htmls(self, urls, extra_loaders=None):
-        """
-        Load HTML documents from the given URLs.
-        Args:
-            urls (list): A list of URLs to load HTML documents from.
-        Returns:
-            list: A list of loaded HTML documents.
-        """
         if extra_loaders is None:
             extra_loaders = []
         docs = []
@@ -430,14 +321,6 @@ class SearchAssistant:
         return docs
 
     def link_filter(self, all_links, excluded_links):
-        """
-        Filters a list of links based on a list of excluded links.
-        Args:
-            all_links (List[str]): A list of links to filter.
-            excluded_links (List[str]): A list of excluded links.
-        Returns:
-            Set[str]: A list of filtered links.
-        """
         clean_excluded_links = set()
         for excluded_link in excluded_links:
             parsed_link = urlparse(excluded_link)
@@ -450,27 +333,11 @@ class SearchAssistant:
         return filtered_links
 
     def clean_docs(self, docs):
-        """
-        Clean the given HTML documents by transforming them into plain text.
-        Args:
-            docs (list): A list of langchain documents with html content to clean.
-        Returns:
-            list: A list of cleaned plain text documents.
-        """
         html2text_transformer = Html2TextTransformer()
         docs = html2text_transformer.transform_documents(documents=docs)
         return docs
 
     def web_crawl(self, urls, excluded_links=None):
-        """
-        Perform web crawling, retrieve and clean HTML documents from the given URLs, with specified depth of exploration.
-        Args:
-            urls (list): A list of URLs to crawl.
-            excluded_links (list, optional): A list of links to exclude from crawling. Defaults to None.
-            depth (int, optional): The depth of crawling, determining how many layers of internal links to explore. Defaults to 1
-        Returns:
-            tuple: A tuple containing the langchain documents (list) and the scrapped URLs (list).
-        """
         if excluded_links is None:
             excluded_links = []
         excluded_links.extend(self.web_crawling_params['excluded_links'])
@@ -494,17 +361,6 @@ class SearchAssistant:
         self.urls = scrapped_urls
 
     def get_text_chunks_with_references(self, docs: list, chunk_size: int, chunk_overlap: int) -> list:
-        """Gets text chunks. If metadata is not None, it will create chunks with metadata elements.
-
-        Args:
-            docs (list): list of documents or texts. If no metadata is passed, this parameter is a list of documents.
-            If metadata is passed, this parameter is a list of texts.
-            chunk_size (int): chunk size in number of characters
-            chunk_overlap (int): chunk overlap in number of characters
-
-        Returns:
-            list: list of documents
-        """
 
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size, chunk_overlap=chunk_overlap, length_function=len
@@ -518,12 +374,6 @@ class SearchAssistant:
         return chunks
 
     def create_load_vector_store(self, force_reload: bool = False, update: bool = False):
-        """
-        Create a vector store based on the given documents.
-        Args:
-            force_reload (bool, optional): Whether to force reloading the vector store. Defaults to False.
-            update (bool, optional): Whether to update the vector store. Defaults to False.
-        """
 
         persist_directory = self.config.get('persist_directory', 'NoneDirectory')
 
@@ -559,13 +409,6 @@ class SearchAssistant:
             )
 
     def create_and_save_local(self, input_directory=None, persist_directory=None, update=False):
-        """
-        Create a vector store based on the given documents.
-        Args:
-            input_directory: The directory containing the previously created vectorstore.
-            persist_directory: The directory to save the vectorstore.
-            update (bool, optional): Whether to update the vector store. Defaults to False.
-        """
         persist_directory = persist_directory or self.config.get('persist_directory', 'NoneDirectory')
 
         chunks = self.get_text_chunks_with_references(
@@ -593,48 +436,40 @@ class SearchAssistant:
                     chunks, embeddings, self.retrieval_info['db_type'], None
                 )
 
-    def basic_call(
-        self,
-        query,
-        reformulated_query=None,
-        search_method='serpapi',
-        max_results=5,
-        search_engine='google',
-        conversational=False,
-    ):
-        """
-        Do a basic call to the llm using the query result snippets as context
-        Args:
-            query (str): The query to search.
-            reformulated_query (str, optional): The reformulated query to search. Defaults to None.
-            search_method (str, optional): The search method to use. Defaults to "serpapi".
-            max_results (int, optional): The maximum number of search results to retrieve. Defaults to 5.
-            search_engine (str, optional): The search engine to use. Defaults to "google".
-            conversational (bool, optional): Whether to save conversation to memory. Defaults to False.
-        """
+    def basic_call(self, query, reformulated_query=None, search_method='serpapi', max_results=5, search_engine='google', conversational=False):
         if reformulated_query is None:
             reformulated_query = query
 
+        local_context = ""
+        if self.vectorstore:
+            local_results = self.vectorstore.similarity_search(query, k=2)
+            if local_results:
+                local_context = "\n".join([doc.page_content for doc in local_results])
+
         if search_method == 'serpapi':
-            answer, links = self.querySerpapi(
-                query=reformulated_query, limit=max_results, engine=search_engine, do_analysis=True
-            )
+            answer, links = self.querySerpapi(query=reformulated_query, limit=max_results, engine=search_engine, do_analysis=True)
         elif search_method == 'serper':
             answer, links = self.querySerper(query=reformulated_query, limit=max_results, do_analysis=True)
         elif search_method == 'openserp':
-            answer, links = self.queryOpenSerp(
-                query=reformulated_query, limit=max_results, engine=search_engine, do_analysis=True
-            )
+            answer, links = self.queryOpenSerp(query=reformulated_query, limit=max_results, engine=search_engine, do_analysis=True)
+
+        # Integrate local context into the answer
+        if local_context:
+            answer = f"{answer}\n\nAdditional information from local documents:\n{local_context}"
+
+        if self.vectorstore:
+            local_sources = [doc.metadata.get('source', 'Local PDF') for doc in local_results]
+            links = local_sources + links
 
         if conversational:
             self.memory.save_context(inputs={'input': query}, outputs={'answer': answer})
 
         return {'answer': answer, 'sources': links}
 
+
+
+
     def set_retrieval_qa_chain(self, conversational=False):
-        """
-        Set a retrieval chain for queries that use as retriever a previously created vectorstore
-        """
         retrieval_qa_prompt = load_prompt(os.path.join(kit_dir, 'prompts/llama3-web_scraped_data_retriever.yaml'))
         retriever = self.vector_store.as_retriever(
             search_type='similarity_score_threshold',
@@ -673,14 +508,7 @@ class SearchAssistant:
             )
 
     def search_and_scrape(self, query, search_method='serpapi', max_results=5, search_engine='google'):
-        """
-        Do a call to the serp tool, scrape the url results, and save the scraped data in a a vectorstore
-        Args:
-            query (str): The query to search.
-            max_results (int): The maximum number of search results. Default is 5
-            search_method (str, optional): The search method to use. Defaults to "serpapi".
-            search_engine (str, optional): The search engine to use. Defaults to "google".
-        """
+
         if search_method == 'serpapi':
             _, links = self.querySerpapi(query=query, limit=max_results, engine=search_engine, do_analysis=False)
         elif search_method == 'serper':
@@ -696,15 +524,6 @@ class SearchAssistant:
             return {'message': f"No links found for '{query}'. Try again"}
 
     def get_relevant_queries(self, query):
-        """
-        Generates a list of related queries based on the input query.
-
-        Args:
-        query (str): The input query for which related queries are to be generated.
-
-        Returns:
-        list: A list of related queries based on the input query.
-        """
         prompt = load_prompt(os.path.join(kit_dir, 'prompts/llama3-related_questions.yaml'))
         response_schemas = [ResponseSchema(name='related_queries', description=f'related search queries', type='list')]
         list_output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
@@ -714,15 +533,7 @@ class SearchAssistant:
         return relevant_queries_chain.invoke(input_variables).get('related_queries', [])
 
     def parse_retrieval_output(self, result):
-        """
-        Parses the output of the retrieval chain to map the original source numbers with the numbers in generation.
 
-        Args:
-        result (dict): The result from the retrieval chain, containing the answer and source documents.
-
-        Returns:
-        str: The parsed answer with the mapped source numbers.
-        """
         parsed_answer = self.parse_serp_analysis_output(result['answer'], self.urls)
         # mapping original sources order with question used sources order
         question_sources = set(f'{doc.metadata["source"]}' for doc in result['source_documents'])
@@ -735,15 +546,6 @@ class SearchAssistant:
         return parsed_answer
 
     def retrieval_call(self, query):
-        """
-        Do a call to the retriever chain
-
-        Args:
-        query (str): The query to search.
-
-        Returns:
-        result (str): The final Result to the user query
-        """
         result = self.qa_chain.invoke(query)
         result['answer'] = self.parse_retrieval_output(result)
         return result

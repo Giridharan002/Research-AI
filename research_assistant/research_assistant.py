@@ -4,6 +4,8 @@ import logging
 import yaml
 import streamlit as st
 from dotenv import load_dotenv
+from PIL import Image
+
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 kit_dir = os.path.abspath(os.path.join(current_dir, ".."))
@@ -144,15 +146,23 @@ def handle_user_input(user_question, mode):
 
 def main():
     st.set_page_config(
-        page_title="SambaNova Research Assistant",
-        page_icon="https://sambanova.ai/hubfs/logotype_sambanova_orange.png",
+        page_title="Research Assistant",
+        page_icon="/home/giri/ai-starter-kit/images/research_ai-png.png",
     )
-    
+
+   
+    col1, col2 = st.columns([1, 4])
+
+
+    with col1:
+        logo = Image.open("/home/giri/ai-starter-kit/images/research_ai-png.png")
+        st.image(logo, width=100) 
+
+    with col2:
+        st.title("Research Assistant")
+
     init_session_state()
-    
     documentRetrieval = DocumentRetrieval()
-    
-    st.title("Research Assistant")
     
     mode = st.sidebar.radio("Choose Mode", ["Document Chat", "Web Search"])
     
